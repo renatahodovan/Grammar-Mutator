@@ -159,6 +159,49 @@ TEST_F(CustomMutatorTest, Fuzzing) {
 
 }
 
+TEST_F(CustomMutatorTest, FuzzingLongerThanMaxSize) {
+
+  uint8_t *buf = nullptr;
+
+  // prepare a tree
+  auto tree = gen_init__(0);
+  dump_tree_to_test_case(tree, "afl_test_fuzz_out/queue/fuzz_0");
+  write_tree_to_file(tree, "afl_test_fuzz_out/trees/fuzz_0");
+
+  uint8_t ret = afl_custom_queue_get(
+      mutator->data, (const uint8_t *)"afl_test_fuzz_out/queue/fuzz_0");
+  EXPECT_EQ(ret, 1);
+
+  // The mutants longer than the input are neither returned nor kept for a new
+  // queue entry.
+  tree_to_buf(tree);
+  size_t max_size = tree->data_len;
+  int    num = afl_custom_fuzz_count(mutator->data, nullptr, 0);
+  int    rejected = 0;
+  for (int i = 0; i < num; ++i) {
+
+    size_t buf_size =
+        afl_custom_fuzz(mutator->data, tree->data_buf, tree->data_len, &buf,
+                        nullptr, 0, max_size);
+    EXPECT_LE(buf_size, max_size);
+    if (mutator->data->mutated_tree) {
+
+      EXPECT_LE(mutator->data->mutated_tree->data_len, max_size);
+
+    } else {
+
+      ++rejected;
+
+    }
+
+  }
+
+  EXPECT_GT(rejected, 0);
+
+  tree_free(tree);
+
+}
+
 TEST_F(CustomMutatorTest, FuzzingParsingError) {
 
   uint8_t                       *buf = nullptr;

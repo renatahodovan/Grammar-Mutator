@@ -711,8 +711,20 @@ size_t afl_custom_fuzz(my_mutator_t *data, __attribute__((unused)) uint8_t *buf,
 
   tree_to_buf(tree);
   tree_get_size(tree);
+
+  /* A mutant longer than `max_size` is not run. AFL++ would run only its first
+    `max_size` bytes, but a new queue entry would keep the whole tree, so the
+    trees of the queue could grow without bound, and every mutation copies and
+    serializes the whole tree. */
+  if (tree->data_len > max_size) {
+
+    tree_free(tree);
+    return 0;
+
+  }
+
   data->mutated_tree = tree;
-  mutated_size = tree->data_len <= max_size ? tree->data_len : max_size;
+  mutated_size = tree->data_len;
 
   // maybe_grow is optimized to be quick for reused buffers.
   uint8_t *mutated_out =
